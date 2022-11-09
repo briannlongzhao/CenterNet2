@@ -63,9 +63,23 @@ class CustomStem(CNNBlockBase):
             if isinstance(layer, Conv2d):
                 weight_init.c2_msra_fill(layer)
 
+
+    def quantise(self, x, k, do_quantise=True):
+        Max = torch.max(x)
+        Min = torch.min(x)
+        if Max < -Min:
+            Max = -Min
+        if not do_quantise:
+            return x
+        Digital = torch.round(((2 ** k) - 1) * x / Max)
+        output = Max * Digital / ((2 ** k) - 1)
+        return output
+
+
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.conv1(x)  # Change this to custom_conv
         x = self.bn1(x)
         x = F.relu_(x)
         x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
+        # Add quantise here?
         return x
