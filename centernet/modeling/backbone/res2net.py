@@ -22,6 +22,8 @@ from detectron2.modeling.backbone.build import BACKBONE_REGISTRY
 from .fpn_p5 import LastLevelP6P7_P5
 from .bifpn import BiFPN
 
+from .custom_stem import CustomStem
+
 __all__ = [
     "ResNetBlockBase",
     "BasicBlock",
@@ -675,7 +677,7 @@ def build_res2net_backbone(cfg, input_shape):
     """
     # need registration of new blocks/stems?
     norm = cfg.MODEL.RESNETS.NORM
-    stem = BasicStem(
+    stem = CustomStem(
         in_channels=input_shape.channels,
         out_channels=cfg.MODEL.RESNETS.STEM_OUT_CHANNELS,
         norm=norm,
