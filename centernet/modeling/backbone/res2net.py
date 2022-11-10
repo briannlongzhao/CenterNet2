@@ -6,6 +6,7 @@ import fvcore.nn.weight_init as weight_init
 import torch
 import torch.nn.functional as F
 from torch import nn
+import pickle
 
 from detectron2.layers import (
     CNNBlockBase,
@@ -625,7 +626,11 @@ class ResNet(Backbone):
 
     def forward(self, x):
         outputs = {}
+        with open("output/pre_stem.pkl", "wb") as f:
+            pickle.dump(x, f)
         x = self.stem(x)
+        with open("output/post_stem.pkl", "wb") as f:
+            pickle.dump(x, f)
         if "stem" in self._out_features:
             outputs["stem"] = x
         for stage, name in self.stages_and_names:

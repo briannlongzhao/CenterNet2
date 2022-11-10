@@ -64,16 +64,22 @@ class CustomStem(CNNBlockBase):
                 weight_init.c2_msra_fill(layer)
 
 
-    def quantise(self, x, k, do_quantise=True):
-        Max = torch.max(x)
-        Min = torch.min(x)
-        if Max < -Min:
-            Max = -Min
+    def quantize(self, x, k, do_quantise=True):
+        xmax = torch.max(x)
+        xmin = torch.min(x)
+        if xmax < -xmin:
+            xmax = -xmin
         if not do_quantise:
             return x
-        Digital = torch.round(((2 ** k) - 1) * x / Max)
-        output = Max * Digital / ((2 ** k) - 1)
+        digital = torch.round(((2 ** k) - 1) * x / xmax)
+        output = xmax * digital / ((2 ** k) - 1)
         return output
+
+
+    def noise(self, x, mean=0.0, std=0.01):
+        f = torch.normal(torch.full(x.size(), mean), std).to(x.device)
+        x += x * torch.max(x) * f
+        return x
 
 
     def forward(self, x):
@@ -81,5 +87,7 @@ class CustomStem(CNNBlockBase):
         x = self.bn1(x)
         x = F.relu_(x)
         x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
-        # Add quantise here?
+        # Add noise and quantize
+        x = self.noise(x, std=0.01)
+        x = self.quantize(x, k=8)
         return x
