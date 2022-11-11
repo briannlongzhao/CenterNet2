@@ -599,17 +599,18 @@ class CustomStem(BasicStem):
         try:
             with open(path, "rb") as f:
                 pkl = pickle.load(f)
-            pkl = torch.cat((pkl,x), dim=0)
+            pkl = torch.cat((pkl,x.cpu()), dim=0)
         except Exception as e:
             print(e)
-            pkl = x
+            pkl = x.cpu()
         finally:
+            print("saving", path)
             with open(path, "wb") as f:
                 pickle.dump(pkl, f)
 
 
     def forward(self, x):
-        self.save_pickle(x, path="output/pre_stem.pkl")
+        self.save_pickle(x, path="output/pre_stem_cpu.pkl")
         x = self.conv1(x)  # Change this to custom_conv
         x = self.bn1(x)
         x = F.relu_(x)
@@ -617,7 +618,7 @@ class CustomStem(BasicStem):
         # Add noise and quantize
         x = self.noise(x, std=0.01)
         x = self.quantize(x, k=8)
-        self.save_pickle(x, path="output/post_stem.pkl")
+        self.save_pickle(x, path="output/post_stem_cpu.pkl")
         return x
 
 
