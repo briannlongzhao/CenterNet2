@@ -600,7 +600,7 @@ class CustomStem(BasicStem):
             with open(path, "rb") as f:
                 pkl = pickle.load(f)
             pkl = torch.cat((pkl,x), dim=0)
-        except e:
+        except Exception as e:
             print(e)
             pkl = x
         finally:
