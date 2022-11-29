@@ -616,8 +616,8 @@ class CustomStem(BasicStem):
         x = F.relu_(x)
         x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
         # Add noise and quantize
-        x = self.noise(x, std=0.01)
-        x = self.quantize(x, k=8)
+        #x = self.noise(x, std=0.01)
+        #x = self.quantize(x, k=8)
         #self.save_pickle(x, path="output/post_stem_cpu.pkl")
         return x
 
