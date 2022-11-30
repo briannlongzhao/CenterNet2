@@ -567,6 +567,94 @@ class BasicStem(CNNBlockBase):
         return x
 
 
+class customConv2(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=0):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.register_buffer('identity_kernel', torch.ones(out_channels, in_channels, *kernel_size))
+        self.weights = nn.Parameter(torch.Tensor(out_channels, in_channels, *kernel_size), requires_grad=True)
+        with torch.no_grad():
+            self.weights.data.normal_(0.0, 0.8)
+
+    def forward(self, img):
+        b, c, h, w = img.shape[0], img.shape[1], img.shape[2], img.shape[3]
+        p00 = 0.0
+        p01 = -0.000287
+        p10 = 0.0
+        p11 = 0.266
+        p20 = 0.0
+        p21 = -0.1097
+        p30 = 0.0
+        img_unf = nn.functional.unfold(img, kernel_size=self.kernel_size,
+                                       stride=self.stride, padding=self.padding).transpose(1, 2).contiguous()
+        self.identity_kernel = self.identity_kernel.contiguous()
+        identity_weights = self.identity_kernel.view(self.identity_kernel.size(0), -1).contiguous()
+        self.weights = self.weights.contiguous()
+        weights = self.weights.view(self.weights.size(0), -1).contiguous()
+
+        # f0 = (p00 + torch.zeros_like(img_unf)).matmul(identity_weights.t())
+        # f1 = (p10 * (img_unf - 0.5)).matmul(identity_weights.t())
+        # f2 = (p01 * torch.ones_like(img_unf)).matmul(weights.t())
+        # f3 = (p20 * torch.pow(img_unf - 0.5, 2)).matmul(identity_weights.t())
+        # f4 = (p11 * (img_unf - 0.5)).matmul(weights.t())
+        # f5 = (p30 * torch.pow(img_unf - 0.5, 3)).matmul(identity_weights.t())
+        # f6 = (p21 * torch.pow(img_unf - 0.5, 2)).matmul(weights.t())
+        # f = (f0 + f1 + f2 + f3 + f4 + f5 + f6).transpose(1, 2)
+
+        f = ((p00 + torch.zeros_like(img_unf) +
+              p10 * (img_unf) +
+              p20 * torch.pow(img_unf, 2) +
+              p30 * torch.pow(img_unf, 3)).matmul(identity_weights.t()) +
+             (p01 * torch.ones_like(img_unf) +
+              p11 * (img_unf) +
+              p21 * torch.pow(img_unf, 2)
+              ).matmul(weights.t().contiguous())).transpose(1, 2).contiguous() / 75
+
+        g1 = ((0.11 / 75 + torch.zeros_like(img_unf)).matmul(identity_weights.t()) +
+              (0.001309 * torch.ones_like(img_unf) +
+               0.00619 * (img_unf) - 0.009 * torch.pow(img_unf, 2) + 0.001383 * torch.pow(img_unf, 3)
+               ).matmul(weights.t().contiguous())).transpose(1, 2).contiguous()
+
+        g2 = ((0.179 / 75 + torch.zeros_like(img_unf)).matmul(identity_weights.t()) +
+              (-0.0025 * torch.ones_like(img_unf) +
+               0.00303 * (img_unf) - 0.00484 * torch.pow(img_unf, 2) + 0.0175 * torch.pow(img_unf, 3)
+               ).matmul(weights.t().contiguous())).transpose(1, 2).contiguous()
+
+        g3 = ((0.238 / 75 + torch.zeros_like(img_unf)).matmul(identity_weights.t()) +
+              (-0.000954 * torch.ones_like(img_unf) +
+               0.00187 * (img_unf) + 0.001877 * torch.pow(img_unf, 2) + 0.01502 * torch.pow(img_unf, 3)
+               ).matmul(weights.t().contiguous())).transpose(1, 2).contiguous()
+
+        g4 = ((0.388 / 75 + torch.zeros_like(img_unf)).matmul(identity_weights.t()) +
+              (-0.00734 * torch.ones_like(img_unf) +
+               0.001117 * (img_unf) + 0.00752 * torch.pow(img_unf, 2) + 0.009 * torch.pow(img_unf, 3)
+               ).matmul(weights.t().contiguous())).transpose(1, 2).contiguous()
+
+        g5 = ((0.507 / 75 + torch.zeros_like(img_unf)).matmul(identity_weights.t()) +
+              (-0.01017 * torch.ones_like(img_unf) +
+               0.000426 * (img_unf) + 0.00837 * torch.pow(img_unf, 2) + 0.00413 * torch.pow(img_unf, 3)
+               ).matmul(weights.t().contiguous())).transpose(1, 2).contiguous()
+
+        s1 = 1 / (1 + torch.exp(-10 * (0.15 - f)))
+        s2 = 1 / (1 + torch.exp(-10 * (f - 0.15))) + 1 / (1 + torch.exp(-10 * (0.23 - f))) - 1
+        s3 = 1 / (1 + torch.exp(-10 * (f - 0.23))) + 1 / (1 + torch.exp(-10 * (0.32 - f))) - 1
+        s4 = 1 / (1 + torch.exp(-10 * (f - 0.32))) + 1 / (1 + torch.exp(-10 * (0.39 - f))) - 1
+        s5 = 1 / (1 + torch.exp(-10 * (f - 0.39)))
+
+        out = s1 * g1 + s2 * g2 + s3 * g3 + s4 * g4 + s5 * g5
+
+        out_xshape = int((h - self.kernel_size[0] + 2 * self.padding) / self.stride) + 1
+        out_yshape = int((w - self.kernel_size[1] + 2 * self.padding) / self.stride) + 1
+        # out = f.contiguous()
+        out = out.view(b, self.out_channels, out_xshape, out_yshape)  # .contiguous()
+        # out = out/(3*self.kernel_size[0]*self.kernel_size[1])
+        return out
+
+
 class CustomStem(BasicStem):
     """
     The custom ResNet stem (layers before the first residual block).
@@ -578,6 +666,7 @@ class CustomStem(BasicStem):
                 See :func:`layers.get_norm` for supported format.
         """
         super().__init__(in_channels, out_channels, norm)
+        self.custom_conv = customConv2(in_channels, out_channels, kernel_size=(3,3), stride=1, padding=0)
 
     def quantize(self, x, k, do_quantise=True):
         xmax = torch.max(x)
@@ -608,10 +697,10 @@ class CustomStem(BasicStem):
             with open(path, "wb") as f:
                 pickle.dump(pkl, f)
 
-
     def forward(self, x):
         #self.save_pickle(x, path="output/pre_stem_cpu.pkl")
-        x = self.conv1(x)  # Change this to custom_conv
+        #x = self.conv1(x)  # Change this to custom_conv
+        x = self.custom_conv(x)
         x = self.bn1(x)
         x = F.relu_(x)
         x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
