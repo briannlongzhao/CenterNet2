@@ -699,8 +699,8 @@ class CustomStem(BasicStem):
 
     def forward(self, x):
         #self.save_pickle(x, path="output/pre_stem_cpu.pkl")
-        #x = self.conv1(x)  # Change this to custom_conv
-        x = self.custom_conv(x)
+        x = self.conv1(x)  # Change this to custom_conv
+        #x = self.custom_conv(x)
         x = self.bn1(x)
         x = F.relu_(x)
         x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
