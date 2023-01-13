@@ -659,7 +659,7 @@ class CustomStem(BasicStem):
     """
     The custom ResNet stem (layers before the first residual block).
     """
-    def __init__(self, in_channels=3, out_channels=64, norm="BN"):
+    def __init__(self, in_channels=3, out_channels=64, norm="BN", noise_level=0):
         """
         Args:
             norm (str or callable): norm after the first conv layer.
@@ -667,6 +667,7 @@ class CustomStem(BasicStem):
         """
         super().__init__(in_channels, out_channels, norm)
         self.custom_conv = customConv2(in_channels, out_channels, kernel_size=(3,3), stride=1, padding=0)
+        self.noise_level = noise_level
 
     def quantize(self, x, k, do_quantise=True):
         xmax = torch.max(x)
@@ -705,8 +706,8 @@ class CustomStem(BasicStem):
         x = F.relu_(x)
         x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
         # Add noise and quantize
-        #x = self.noise(x, std=0.01)
-        #x = self.quantize(x, k=8)
+        x = self.noise(x, std=self.noise_level)
+        x = self.quantize(x, k=8)
         #self.save_pickle(x, path="output/post_stem_cpu.pkl")
         return x
 
@@ -825,6 +826,7 @@ def build_res2net_backbone(cfg, input_shape):
         in_channels=input_shape.channels,
         out_channels=cfg.MODEL.RESNETS.STEM_OUT_CHANNELS,
         norm=norm,
+        noise_level=cfg.MODEL.RESNETS.NOISE_LEVEL
     )
 
     # fmt: off
